@@ -1,5 +1,7 @@
 from http import HTTPStatus
 
+from fast_zero.schemas import UserPublic
+
 
 def test_read_root_deve_retornar_ok_e_ola_mundo(client):
     response = client.get('/')  # Act (Agir)
@@ -35,7 +37,7 @@ def test_create_user(client):
         json={
             'username': 'matt',
             'password': '1234',
-            'email': 'test@exemple.com',
+            'email': 'test@example.com',
         },
     )
 
@@ -43,32 +45,59 @@ def test_create_user(client):
     assert response.json() == {
         'id': 1,
         'username': 'matt',
-        'email': 'test@exemple.com',
+        'email': 'test@example.com',
     }
+
+
+def test_create_user_username_already_exists(client, user):
+    response = client.post(
+        '/users/',
+        json={
+            'username': 'matt',
+            'password': '1234',
+            'email': 'test@example.com'
+        }
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
+
+
+def test_create_user_email_already_exists(client, user):
+    response = client.post(
+        '/users/',
+        json={
+            'username': 'matt2',
+            'password': '1234',
+            'email': 'test@example.com'
+        }
+    )
+
+    assert response.status_code == HTTPStatus.BAD_REQUEST
 
 
 def test_read_users(client):
     response = client.get('/users/')
 
     assert response.status_code == HTTPStatus.OK
-    assert response.json() == {
-        'users': [
-            {
-                'id': 1,
-                'username': 'matt',
-                'email': 'test@exemple.com',
-            }
-        ]
-    }
+    assert response.json() == {'users': []}
 
 
-def test_update_user(client):
+def test_read_users_with_user(client, user):
+    user_schema = UserPublic.model_validate(user).model_dump()
+
+    response = client.get('/users/')
+
+    assert response.status_code == HTTPStatus.OK
+    assert response.json() == {'users': [user_schema]}
+
+
+def test_update_user(client, user):
     response = client.put(
         '/users/1',
         json={
             'id': 1,
             'username': 'matt2',
-            'email': 'test@exemple.com',
+            'email': 'test@example.com',
             'password': '123',
         },
     )
@@ -77,7 +106,7 @@ def test_update_user(client):
     assert response.json() == {
         'id': 1,
         'username': 'matt2',
-        'email': 'test@exemple.com',
+        'email': 'test@example.com',
     }
 
 
@@ -95,15 +124,12 @@ def test_update_user_not_found(client):
     assert response.status_code == HTTPStatus.NOT_FOUND
 
 
-def test_get_user(client):
+def test_get_user(client, user):
+    user_schema = UserPublic.model_validate(user).model_dump()
     response = client.get('/users/1')
 
     assert response.status_code == HTTPStatus.OK
-    assert response.json() == {
-        'id': 1,
-        'username': 'matt2',
-        'email': 'test@exemple.com',
-    }
+    assert response.json() == user_schema
 
 
 def test_get_user_not_found(client):
@@ -112,7 +138,7 @@ def test_get_user_not_found(client):
     assert response.status_code == HTTPStatus.NOT_FOUND
 
 
-def test_delete_user(client):
+def test_delete_user(client, user):
     response = client.delete('/users/1')
 
     assert response.status_code == HTTPStatus.OK
