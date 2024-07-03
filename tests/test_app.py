@@ -10,6 +10,18 @@ def test_read_root_deve_retornar_ok_e_ola_mundo(client):
     assert response.json() == {'message': 'olá mundo!'}  # Assert (Afirmar)
 
 
+def test_get_token(client, user):
+    response = client.post(
+        '/token/',
+        data={'username': user.email, 'password': user.clean_password},
+    )
+
+    token = response.json()
+    assert response.status_code == HTTPStatus.OK
+    assert token['token_type'] == 'Bearer'
+    assert 'access_token' in token
+
+
 def test_html_deve_retornar_ok_e_pagina_html(client):
     response = client.get('/html')
 
@@ -55,8 +67,8 @@ def test_create_user_username_already_exists(client, user):
         json={
             'username': 'matt',
             'password': '1234',
-            'email': 'test@example.com'
-        }
+            'email': 'test@example.com',
+        },
     )
 
     assert response.status_code == HTTPStatus.BAD_REQUEST
@@ -68,8 +80,8 @@ def test_create_user_email_already_exists(client, user):
         json={
             'username': 'matt2',
             'password': '1234',
-            'email': 'test@example.com'
-        }
+            'email': 'test@example.com',
+        },
     )
 
     assert response.status_code == HTTPStatus.BAD_REQUEST
@@ -96,7 +108,7 @@ def test_update_user(client, user):
         '/users/1',
         json={
             'id': 1,
-            'username': 'matt2',
+            'username': 'mattUpdate',
             'email': 'test@example.com',
             'password': '123',
         },
@@ -105,7 +117,7 @@ def test_update_user(client, user):
     assert response.status_code == HTTPStatus.OK
     assert response.json() == {
         'id': 1,
-        'username': 'matt2',
+        'username': 'mattUpdate',
         'email': 'test@example.com',
     }
 
