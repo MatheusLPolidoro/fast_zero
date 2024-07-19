@@ -99,7 +99,7 @@ def update_user(
     user_id: int,
     user: UserSchema,
     session: Session = Depends(get_session),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     if user_id != current_user.id:
         raise HTTPException(
@@ -120,7 +120,7 @@ def update_user(
 def delete_user(
     user_id: int,
     session: Session = Depends(get_session),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ):
     if user_id != current_user.id:
         raise HTTPException(
