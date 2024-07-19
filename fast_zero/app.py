@@ -17,6 +17,7 @@ from fast_zero.schemas import (
 )
 from fast_zero.security import (
     create_access_token,
+    get_current_user,
     get_password_hash,
     verify_password,
 )
@@ -47,7 +48,11 @@ def read_html():
 
 
 @app.post('/users/', status_code=HTTPStatus.CREATED, response_model=UserPublic)
-def create_user(user: UserSchema, session: Session = Depends(get_session)):
+def create_user(
+    user: UserSchema,
+    session: Session = Depends(get_session),
+    # current_user=Depends(get_current_user),
+):
     db_user = session.scalar(
         select(User).where(
             (User.username == user.username) | (User.email == user.email)
@@ -81,7 +86,9 @@ def create_user(user: UserSchema, session: Session = Depends(get_session)):
 
 @app.get('/users/', response_model=UsersList)
 def read_users(
-    limit: int = 10, offset: int = 0, session: Session = Depends(get_session)
+    limit: int = 10,
+    offset: int = 0,
+    session: Session = Depends(get_session),
 ):
     user = session.scalars(select(User).limit(limit).offset(offset))
     return {'users': user}
@@ -89,35 +96,38 @@ def read_users(
 
 @app.put('/users/{user_id}', response_model=UserPublic)
 def update_user(
-    user_id: int, user: UserSchema, session: Session = Depends(get_session)
+    user_id: int,
+    user: UserSchema,
+    session: Session = Depends(get_session),
+    current_user=Depends(get_current_user),
 ):
-    db_user = session.scalar(select(User).where(User.id == user_id))
-
-    if not db_user:
+    if user_id != current_user.id:
         raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail='User not found'
+            status_code=HTTPStatus.BAD_REQUEST, detail='Not enough permission'
         )
 
-    db_user.username = user.username
-    db_user.email = user.email
-    db_user.password = get_password_hash(user.password)
+    current_user.username = user.username
+    current_user.email = user.email
+    current_user.password = get_password_hash(user.password)
 
     session.commit()
-    session.refresh(db_user)
+    session.refresh(current_user)
 
-    return db_user
+    return current_user
 
 
 @app.delete('/users/{user_id}', response_model=Message)
-def delete_user(user_id: int, session: Session = Depends(get_session)):
-    db_user = session.scalar(select(User).where(User.id == user_id))
-
-    if not db_user:
+def delete_user(
+    user_id: int,
+    session: Session = Depends(get_session),
+    current_user=Depends(get_current_user),
+):
+    if user_id != current_user.id:
         raise HTTPException(
-            status_code=HTTPStatus.NOT_FOUND, detail='User not found'
+            status_code=HTTPStatus.BAD_REQUEST, detail='Not enough permission'
         )
 
-    session.delete(db_user)
+    session.delete(current_user)
     session.commit()
 
     return {'message': 'User deleted'}
@@ -144,7 +154,8 @@ def login_for_access_token(
 
     if not user or not verify_password(form_data.password, user.password):
         raise HTTPException(
-            status_code=400, detail='Incorrect email or password'
+            status_code=HTTPStatus.BAD_REQUEST,
+            detail='Incorrect email or password',
         )
 
     access_token = create_access_token(data_claims={'sub': user.email})
