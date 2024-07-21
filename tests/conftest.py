@@ -1,3 +1,5 @@
+import factory
+import factory.fuzzy
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
@@ -6,8 +8,27 @@ from sqlalchemy.pool import StaticPool
 
 from fast_zero.app import app
 from fast_zero.database import get_session
-from fast_zero.models import User, table_registry
+from fast_zero.models import Todo, TodoState, User, table_registry
 from fast_zero.security import get_password_hash
+
+
+class UserFactory(factory.Factory):
+    class Meta:
+        model = User
+
+    username = factory.Sequence(lambda n: f'test{n}')
+    email = factory.LazyAttribute(lambda obj: f'{obj.username}@test.com')
+    password = factory.LazyAttribute(lambda obj: f'{obj.username}+senha')
+
+
+class TodoFactory(factory.Factory):
+    class Meta:
+        model = Todo
+
+    title = factory.Faker('text')
+    description = factory.Faker('text')
+    state = factory.fuzzy.FuzzyChoice(TodoState)
+    user_id = 1
 
 
 @pytest.fixture()
@@ -40,16 +61,22 @@ def session():
 @pytest.fixture()
 def user(session):
     password = '1234'
-    user = User(
-        username='matt',
-        email='test@example.com',
-        password=get_password_hash(password),
-    )
+    user = UserFactory(password=get_password_hash(password))
     session.add(user)
     session.commit()
     session.refresh(user)
 
-    user.clean_password = password
+    user.clean_password = password  # Monkey Patch
+
+    return user
+
+
+@pytest.fixture()
+def other_user(session):
+    user = UserFactory()
+    session.add(user)
+    session.commit()
+    session.refresh(user)
 
     return user
 
@@ -57,7 +84,7 @@ def user(session):
 @pytest.fixture()
 def token(client, user):
     response = client.post(
-        '/token',
+        '/auth/token',
         data={'username': user.email, 'password': user.clean_password},
     )
 
